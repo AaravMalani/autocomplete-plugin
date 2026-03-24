@@ -1,20 +1,44 @@
 import { IChannel, IConduit, IPlugin } from "@sourceacademy/conductor/conduit";
-import { CHANNEL_ID, WEB_PLUGIN_ID } from "./constants";
-import { TestMessage } from "./types";
-export default class WebPlugin implements IPlugin {
-  static readonly channelAttach = [CHANNEL_ID];
-  readonly id: string = WEB_PLUGIN_ID;
+import { AUTOCOMPLETE_CHANNEL_ID, SYNTAX_CHANNEL_ID, WEB_PLUGIN_ID } from "./constants";
+import type { AutoCompleteEntry, AutoCompleteMessage } from "./types/autocomplete";
+import type { SyntaxHighlightMessage, SyntaxHighlightData } from "./types/syntax";
 
-  private readonly __conduit: IConduit;
-  private readonly __testChannel: IChannel<TestMessage>;
+export abstract class BaseAutoCompleteWebPlugin implements IPlugin {
+  static readonly channelAttach = [AUTOCOMPLETE_CHANNEL_ID, SYNTAX_CHANNEL_ID];
+  readonly id: string = WEB_PLUGIN_ID; // Should be migrated to an ID in v0.3.0
+  private readonly __autoCompleteChannel: IChannel<AutoCompleteMessage>;
+  private readonly __syntaxChannel: IChannel<SyntaxHighlightMessage>;
+
+  /**
+   * The `autocomplete` method should return a list of autocomplete suggestions based on the provided code and cursor position.
+   * The call is forwarded from the web plugin to the runner plugin, which processes the request and sends back the autocomplete suggestions.
+   * @param code The current code in the editor.
+   * @param row The current row of the cursor in the editor (1-indexed).
+   * @param column The current column of the cursor in the editor (1-indexed).
+   * @returns A list of autocomplete entries relevant to the current cursor position in the code.
+   */
+  abstract autocomplete(code: string, row: number, column: number): AutoCompleteEntry[];
+
+  /**
+   * The `loadMode` method is called when the web plugin receives the syntax highlighting data from the runner plugin.
+   * This method should be implemented to load the syntax highlighting mode based on the received data, enabling the web plugin to perform syntax highlighting of code in the editor.
+   * @param data The syntax highlighting data received from the runner plugin
+   */
+  abstract loadMode(data: SyntaxHighlightData): void;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  constructor(conduit: IConduit, [testChannel]: IChannel<any>[]) {
-    this.__conduit = conduit;
-
-    this.__testChannel = testChannel;
-    this.__testChannel.subscribe(message => {
-      console.log(`WebPlugin received message: ${message.content}`);
-    });
+  constructor(_conduit: IConduit, [autoCompleteChannel, syntaxChannel]: IChannel<any>[]) {
+    this.__autoCompleteChannel = autoCompleteChannel;
+    this.__syntaxChannel = syntaxChannel;
+    this.__syntaxChannel.send({ type: "request" });
+    const handler = (message: SyntaxHighlightMessage) => {
+      if (message.type === "response") {
+        this.__syntaxChannel.send({ type: "ack" });
+        this.__syntaxChannel.unsubscribe(handler);
+        const data = message.data;
+        this.loadMode(data);
+      }
+    };
+    this.__syntaxChannel.subscribe(handler);
   }
 }

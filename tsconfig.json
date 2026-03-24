@@ -5,6 +5,8 @@
     "moduleResolution": "bundler",
     "target": "es2023",
     "sourceMap": true,
-    "esModuleInterop": true
+    "esModuleInterop": true,
+    "declaration": true,
+    "outDir": "dist"
   }
 }

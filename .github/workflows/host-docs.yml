@@ -1,4 +1,4 @@
-name: Build and deploy runner
+name: Host documentation on GitHub Pages
 on:
   push:
     branches:
@@ -6,7 +6,7 @@ on:
 
 jobs:
   build:
-    name: Build runner
+    name: Build documentation
 
     runs-on: ubuntu-latest
 
@@ -26,14 +26,14 @@ jobs:
       - name: yarn install
         run: yarn install --immutable
 
-      - name: yarn build
-        run: yarn build
+      - name: yarn docs
+        run: yarn docs
 
       - name: Upload artifacts
         id: deployment
         uses: actions/upload-pages-artifact@v3
         with:
-          path: dist/
+          path: docs/
 
   deploy:
     needs: build
